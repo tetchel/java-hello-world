@@ -1,0 +1,70 @@
+name: Buildah test
+
+on:
+  # push:
+    # branches: [ main ]
+
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: java-hello-world
+  DIR: test-projects/java-hello
+  STORAGE_DRIVER: vfs
+
+jobs:
+  bud:
+    name: Hello World buildah bud
+    runs-on: [ self-hosted, container-tools ]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: BUD
+        run: |
+          set -x
+          buildah --storage-driver=vfs bud -f ${{ env.DIR }}/Dockerfile -t ${{ env.IMAGE_NAME }}:latest ${{ env.DIR }}
+
+      - name: Check image created
+        run: |
+          buildah --storage-driver=vfs images | grep ${{ env.IMAGE_NAME }}
+
+  build:
+    name: Hello World buildah
+    runs-on: [ self-hosted, container-tools ]
+
+    env:
+      BASE_IMG: docker.io/fabric8/java-alpine-openjdk11-jre
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+
+      # Run maven to build the project
+      - name: Compile
+        working-directory: ${{ env.DIR }}
+        run: ./compile.sh
+
+      - name: Build
+        run: |
+          set -x
+          export WORKING_CONTAINER=$(buildah --storage-driver=vfs from ${{ env.BASE_IMG }})
+          buildah --storage-driver=vfs copy $WORKING_CONTAINER ${{ env.DIR }}/bin/Hello.jar
+          buildah --storage-driver=vfs config --entrypoint ["java","-jar","Hello.jar"] $WORKING_CONTAINER
+          buildah --storage-driver=vfs commit --format=docker --squash $WORKING_CONTAINER ${{ env.IMAGE_NAME }}:latest
+
+      - name: Check image created
+        run: |
+          buildah --storage-driver=vfs images | grep ${{ env.IMAGE_NAME }}
+
+  podman:
+    name: Podman test
+    runs-on: [ self-hosted, container-tools ]
+
+    steps:
+      - name: Podman run
+        run: |
+          podman run hello-world

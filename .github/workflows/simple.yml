@@ -1,0 +1,36 @@
+name: Compile
+
+on:
+  push:
+    branches: [ main ]
+
+  workflow_dispatch:
+
+env:
+  DIR: test-projects/java-hello
+  JAR_NAME: Hello.jar
+
+jobs:
+  compile:
+    name: Build Hello World Java
+    # runs-on: self-hosted
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+
+      # Run maven to build the project
+      - name: Compile
+        working-directory: ${{ env.DIR }}
+        run: ./compile.sh
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ env.JAR_NAME }}
+          path: ${{ env.DIR }}/bin/${{ env.JAR_NAME }}
+          if-no-files-found: error
